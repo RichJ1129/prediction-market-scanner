@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 /// Represents a market from the Polymarket API
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Market {
     pub question: String,
@@ -11,6 +11,12 @@ pub struct Market {
     pub volume: Option<String>,
     #[serde(default)]
     pub liquidity: Option<String>,
+    #[serde(default)]
+    pub condition_id: Option<String>,
+    #[serde(default)]
+    pub closed: Option<bool>,
+    #[serde(default)]
+    pub outcomes: Option<String>,
 }
 
 /// Represents a detected arbitrage opportunity
@@ -74,4 +80,64 @@ impl ArbitrageOpportunity {
         );
         println!("{}", "-".repeat(80));
     }
+}
+
+/// Represents a trade from the Polymarket trades API
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Trade {
+    pub proxy_wallet: String,
+    pub side: String,  // "BUY" or "SELL"
+    pub condition_id: String,
+    pub size: f64,
+    pub price: f64,
+    pub timestamp: i64,
+    pub outcome: String,
+    pub outcome_index: usize,
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+/// Represents a wallet's position in a market
+#[derive(Debug, Clone)]
+pub struct Position {
+    pub condition_id: String,
+    pub outcome_index: usize,
+    pub net_shares: f64,
+    pub avg_price: f64,
+    pub total_invested: f64,
+    pub market_title: String,
+}
+
+/// Represents a resolved position outcome
+#[derive(Debug, Clone)]
+pub struct ResolvedPosition {
+    pub condition_id: String,
+    pub market_title: String,
+    pub bet_outcome_index: usize,
+    pub winning_outcome_index: usize,
+    pub net_shares: f64,
+    pub avg_price: f64,
+    pub total_invested: f64,
+    pub payout: f64,
+    pub profit: f64,
+    pub won: bool,
+}
+
+/// Represents performance metrics for a wallet
+#[derive(Debug, Clone)]
+pub struct WalletPerformance {
+    pub wallet_address: String,
+    pub total_trades: usize,
+    pub total_markets: usize,
+    pub resolved_positions: usize,
+    pub wins: usize,
+    pub losses: usize,
+    pub win_rate: f64,
+    pub total_invested: f64,
+    pub total_payout: f64,
+    pub net_profit: f64,
+    pub roi: f64,
+    pub avg_profit_per_win: f64,
+    pub avg_loss_per_loss: f64,
 }

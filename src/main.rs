@@ -7,10 +7,12 @@ use tokio::time::Instant;
 mod client;
 mod models;
 mod scanner;
+mod wallet_analyzer;
 
 // Import items from our modules
 use client::PolymarketClient;
 use scanner::ArbitrageScanner;
+use wallet_analyzer::WalletAnalyzer;
 
 /// Run a single scan iteration
 async fn run_single_scan(
@@ -63,10 +65,68 @@ async fn run_single_scan(
     Ok(opportunities.len())
 }
 
+/// Analyzes a wallet's trading performance
+async fn analyze_wallet(wallet_address: &str) -> Result<()> {
+    println!("Polymarket Wallet Analyzer");
+    println!("==========================\n");
+    println!("Analyzing wallet: {}\n", wallet_address);
+
+    let client = PolymarketClient::new();
+    let analyzer = WalletAnalyzer::new();
+
+    // Fetch wallet trades
+    println!("📊 Fetching trade history...");
+    let fetch_start = Instant::now();
+    let trades = client.fetch_wallet_trades(wallet_address).await?;
+    let fetch_duration = fetch_start.elapsed();
+    println!("✓ Fetched {} trades in {:.2}s\n", trades.len(), fetch_duration.as_secs_f64());
+
+    if trades.is_empty() {
+        println!("No trades found for this wallet.");
+        return Ok(());
+    }
+
+    // Fetch resolved markets
+    println!("🔍 Fetching resolved markets...");
+    let markets_start = Instant::now();
+    let resolved_markets = client.fetch_resolved_markets().await?;
+    let markets_duration = markets_start.elapsed();
+    println!(
+        "✓ Fetched {} resolved markets in {:.2}s\n",
+        resolved_markets.len(),
+        markets_duration.as_secs_f64()
+    );
+
+    // Analyze performance
+    println!("📈 Analyzing performance...");
+    let analysis_start = Instant::now();
+    let performance = analyzer.analyze(&trades, &resolved_markets);
+    let analysis_duration = analysis_start.elapsed();
+    println!("✓ Analysis completed in {:.3}s", analysis_duration.as_secs_f64());
+
+    // Print results
+    analyzer.print_performance(&performance);
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Check for command-line arguments
+    let args: Vec<String> = std::env::args().collect();
+
+    // If wallet address provided, run wallet analysis mode
+    if args.len() > 1 {
+        let wallet_address = &args[1];
+        return analyze_wallet(wallet_address).await;
+    }
+
+    // Otherwise, run arbitrage scanner
     println!("Polymarket Arbitrage Scanner");
     println!("============================\n");
+    println!("Usage: To analyze a wallet, run:");
+    println!("  cargo run <wallet_address>\n");
+    println!("Running arbitrage scanner...\n");
 
     // Create API client and scanner (reused across iterations)
     let client = PolymarketClient::new();
