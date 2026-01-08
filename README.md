@@ -2,6 +2,16 @@
 
 A Rust-based toolkit for analyzing Polymarket prediction markets and detecting potential insider trading patterns.
 
+## Quick Start
+
+```bash
+# Auto-scan for insider wallets (easiest way)
+cargo run -- --scan
+
+# Or analyze a specific wallet
+cargo run -- 0x<wallet_address>
+```
+
 ## Features
 
 ### 1. Arbitrage Scanner
@@ -22,15 +32,40 @@ cargo build --release
 
 ## Usage
 
-### Analyze a Wallet for Insider Activity
+### 1. Auto-Scan for Insider Wallets (Recommended)
+
+Automatically finds and analyzes active wallets:
 
 ```bash
-cargo run <wallet_address>
+cargo run -- --scan [sample_size]
+```
+
+Examples:
+```bash
+# Scan 5000 recent trades (default)
+cargo run -- --scan
+
+# Scan 10000 recent trades for more wallets
+cargo run -- --scan 10000
+```
+
+The scanner will:
+1. Fetch recent trades from Polymarket
+2. Identify the most active wallets
+3. Analyze each wallet's full trading history
+4. Report only wallets with suspicious patterns
+
+**Note**: Recent traders may not have resolved positions yet. For best results, use a larger sample size to find wallets with historical trading data.
+
+### 2. Analyze a Specific Wallet
+
+```bash
+cargo run -- <wallet_address>
 ```
 
 Example:
 ```bash
-cargo run 0x3a57792d11b5b578384f260d73c12eec795afb43
+cargo run -- 0x3a57792d11b5b578384f260d73c12eec795afb43
 ```
 
 The analyzer will:
@@ -39,7 +74,7 @@ The analyzer will:
 3. Calculate win rates and profitability metrics
 4. Flag suspicious patterns
 
-### Run Arbitrage Scanner
+### 3. Run Arbitrage Scanner
 
 ```bash
 cargo run

@@ -21,44 +21,37 @@ impl WalletScanner {
     /// Scans recent trades to find wallets with high activity
     pub async fn find_active_wallets(&self, sample_size: usize) -> Result<Vec<String>> {
         println!("🔍 Scanning recent trades to find active wallets...");
+        println!("  Fetching {} recent trades...", sample_size);
+
+        let trades = self.client.fetch_recent_trades(sample_size).await?;
+
+        println!("✓ Fetched {} trades", trades.len());
+        println!("  Analyzing wallet activity...");
 
         let mut wallet_trade_count: HashMap<String, usize> = HashMap::new();
-        let limit = 1000;
-        let mut fetched = 0;
 
-        while fetched < sample_size {
-            let trades: Vec<Trade> = self
-                .client
-                .fetch_wallet_trades("")
-                .await
-                .unwrap_or_default();
-
-            if trades.is_empty() {
-                break;
-            }
-
-            for trade in trades {
-                *wallet_trade_count.entry(trade.proxy_wallet).or_insert(0) += 1;
-            }
-
-            fetched += limit;
-
-            if fetched % 5000 == 0 {
-                println!("  Scanned {} trades...", fetched);
-            }
+        for trade in trades {
+            *wallet_trade_count.entry(trade.proxy_wallet).or_insert(0) += 1;
         }
 
         // Get top wallets by trade count
         let mut wallet_counts: Vec<_> = wallet_trade_count.into_iter().collect();
         wallet_counts.sort_by(|a, b| b.1.cmp(&a.1));
 
+        println!("✓ Found {} unique wallets", wallet_counts.len());
+
+        // Take top N wallets with at least 3 trades
         let top_wallets: Vec<String> = wallet_counts
             .into_iter()
-            .take(50)
-            .map(|(wallet, _)| wallet)
+            .filter(|(_, count)| *count >= 3)
+            .take(30)
+            .map(|(wallet, count)| {
+                println!("  {} ({} trades)", wallet, count);
+                wallet
+            })
             .collect();
 
-        println!("✓ Found {} active wallets\n", top_wallets.len());
+        println!("\n✓ Selected {} wallets for analysis\n", top_wallets.len());
 
         Ok(top_wallets)
     }

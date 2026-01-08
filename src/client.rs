@@ -134,6 +134,39 @@ impl PolymarketClient {
         Ok(all_trades)
     }
 
+    /// Fetches recent trades (no wallet filter) to discover active wallets
+    pub async fn fetch_recent_trades(&self, limit: usize) -> Result<Vec<Trade>> {
+        let mut all_trades = Vec::new();
+        let page_limit = 1000;
+        let mut offset = 0;
+
+        while all_trades.len() < limit {
+            let fetch_limit = std::cmp::min(page_limit, limit - all_trades.len());
+
+            let trades: Vec<Trade> = self.client
+                .get(TRADES_API_URL)
+                .query(&[
+                    ("limit", &fetch_limit.to_string()),
+                    ("offset", &offset.to_string()),
+                ])
+                .send()
+                .await?
+                .json()
+                .await?;
+
+            let count = trades.len();
+            all_trades.extend(trades);
+
+            if count < fetch_limit {
+                break;
+            }
+
+            offset += fetch_limit;
+        }
+
+        Ok(all_trades)
+    }
+
     /// Fetches all closed/resolved markets
     pub async fn fetch_resolved_markets(&self) -> Result<Vec<Market>> {
         let limit = 100;

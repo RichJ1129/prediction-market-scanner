@@ -8,11 +8,13 @@ mod client;
 mod models;
 mod scanner;
 mod wallet_analyzer;
+mod wallet_scanner;
 
 // Import items from our modules
 use client::PolymarketClient;
 use scanner::ArbitrageScanner;
 use wallet_analyzer::WalletAnalyzer;
+use wallet_scanner::WalletScanner;
 
 /// Run a single scan iteration
 async fn run_single_scan(
@@ -110,22 +112,56 @@ async fn analyze_wallet(wallet_address: &str) -> Result<()> {
     Ok(())
 }
 
+/// Auto-scan mode: Find and analyze active wallets for insider patterns
+async fn auto_scan_for_insiders(sample_size: usize) -> Result<()> {
+    println!("Polymarket Insider Scanner");
+    println!("==========================\n");
+    println!("Automatically finding and analyzing wallets for insider patterns...\n");
+
+    let scanner = WalletScanner::new();
+
+    // Step 1: Find active wallets
+    let wallets = scanner.find_active_wallets(sample_size).await?;
+
+    if wallets.is_empty() {
+        println!("No active wallets found.");
+        return Ok(());
+    }
+
+    // Step 2: Analyze them for insider patterns
+    scanner.scan_for_insiders(&wallets).await?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Check for command-line arguments
     let args: Vec<String> = std::env::args().collect();
 
+    // Check for --scan flag
+    if args.len() > 1 && args[1] == "--scan" {
+        let sample_size = if args.len() > 2 {
+            args[2].parse().unwrap_or(5000)
+        } else {
+            5000
+        };
+        return auto_scan_for_insiders(sample_size).await;
+    }
+
     // If wallet address provided, run wallet analysis mode
-    if args.len() > 1 {
+    if args.len() > 1 && args[1].starts_with("0x") {
         let wallet_address = &args[1];
         return analyze_wallet(wallet_address).await;
     }
 
     // Otherwise, run arbitrage scanner
-    println!("Polymarket Arbitrage Scanner");
-    println!("============================\n");
-    println!("Usage: To analyze a wallet, run:");
-    println!("  cargo run <wallet_address>\n");
+    println!("Polymarket Analysis Tools");
+    println!("=========================\n");
+    println!("Usage:");
+    println!("  cargo run --scan [sample_size]    - Auto-scan for insider wallets (default: 5000 trades)");
+    println!("  cargo run <wallet_address>        - Analyze a specific wallet");
+    println!("  cargo run                          - Run arbitrage scanner\n");
     println!("Running arbitrage scanner...\n");
 
     // Create API client and scanner (reused across iterations)
