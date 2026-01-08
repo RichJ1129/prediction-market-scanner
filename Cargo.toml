@@ -1,5 +1,5 @@
 [package]
-name = "polymarket-arbitrage-scanner"
+name = "prediction-market-scanner"
 version = "0.1.0"
 edition = "2021"
 

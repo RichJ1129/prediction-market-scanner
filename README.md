@@ -1,6 +1,6 @@
-# Polymarket Analysis Tools
+# Prediction Market Scanner
 
-A Rust-based toolkit for analyzing Polymarket prediction markets and detecting potential insider trading patterns.
+A Rust-based toolkit for analyzing Polymarket prediction markets and discovering profitable traders.
 
 ## Quick Start
 
@@ -35,6 +35,14 @@ Automatically discovers and analyzes profitable traders on Polymarket:
 ```bash
 cargo build --release
 ```
+
+## Overview
+
+This scanner helps you discover consistently profitable traders on Polymarket by:
+- Analyzing thousands of active wallets automatically
+- Filtering for statistically significant profitability
+- Identifying suspicious trading patterns
+- Running continuously to accumulate results over time
 
 ## Usage
 
@@ -304,6 +312,10 @@ Improvements welcome! Areas for enhancement:
 ## License
 
 MIT
+
+## Repository
+
+GitHub: [prediction-market-scanner](https://github.com/RichJ1129/prediction-market-scanner)
 
 ## Disclaimer
 
