@@ -83,13 +83,11 @@ impl PolymarketClient {
                         next_offset += limit;
                     }
                 }
-                Ok((offset, Err(e))) => {
-                    eprintln!("Warning: Failed to fetch page at offset {}: {}", offset, e);
-                    // Continue with other pages
+                Ok((_offset, Err(_e))) => {
+                    // Silently ignore fetch errors
                 }
-                Err(e) => {
-                    eprintln!("Warning: Task failed: {}", e);
-                    // Continue with other pages
+                Err(_e) => {
+                    // Silently ignore task errors
                 }
             }
         }
@@ -228,11 +226,11 @@ impl PolymarketClient {
                         next_offset += limit;
                     }
                 }
-                Ok((offset, Err(e))) => {
-                    eprintln!("Warning: Failed to fetch page at offset {}: {}", offset, e);
+                Ok((_offset, Err(_e))) => {
+                    // Silently ignore fetch errors - typically means we've reached end of data
                 }
-                Err(e) => {
-                    eprintln!("Warning: Task failed: {}", e);
+                Err(_e) => {
+                    // Silently ignore task errors
                 }
             }
         }
