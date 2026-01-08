@@ -170,8 +170,8 @@ impl PolymarketClient {
         Ok(all_trades)
     }
 
-    /// Fetches all closed/resolved markets
-    pub async fn fetch_resolved_markets(&self) -> Result<Vec<Market>> {
+    /// Fetches resolved markets with optional limit
+    pub async fn fetch_resolved_markets_limited(&self, max_markets: Option<usize>) -> Result<Vec<Market>> {
         let limit = 100;
         let max_concurrent = 10; // Reduced concurrency to avoid rate limits
 
@@ -182,6 +182,13 @@ impl PolymarketClient {
         // If first page is partial, we're done
         if first_page_count < limit {
             return Ok(first_page);
+        }
+
+        // Check if we've already hit the limit
+        if let Some(max) = max_markets {
+            if first_page_count >= max {
+                return Ok(first_page.into_iter().take(max).collect());
+            }
         }
 
         // Initialize for concurrent fetching
@@ -234,10 +241,23 @@ impl PolymarketClient {
                         } else if all_markets.len() % 100 == 0 {
                             eprint!(".");
                         }
+
+                        // Check if we've reached the limit
+                        if let Some(max) = max_markets {
+                            if all_markets.len() >= max {
+                                break; // Stop fetching
+                            }
+                        }
                     }
 
-                    // If page is full, spawn next request
-                    if page_count == limit && !spawned_offsets.contains(&next_offset) && consecutive_empty_pages < max_consecutive_empty {
+                    // If page is full, spawn next request (and we haven't hit limit)
+                    let should_continue = if let Some(max) = max_markets {
+                        all_markets.len() < max
+                    } else {
+                        true
+                    };
+
+                    if page_count == limit && !spawned_offsets.contains(&next_offset) && consecutive_empty_pages < max_consecutive_empty && should_continue {
                         spawned_offsets.insert(next_offset);
 
                         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -264,7 +284,19 @@ impl PolymarketClient {
         }
 
         eprintln!(); // New line after progress indicator
-        Ok(all_markets)
+
+        // Trim to max if we over-fetched
+        if let Some(max) = max_markets {
+            Ok(all_markets.into_iter().take(max).collect())
+        } else {
+            Ok(all_markets)
+        }
+    }
+
+    /// Fetches all closed/resolved markets
+    pub async fn fetch_resolved_markets(&self) -> Result<Vec<Market>> {
+        // Fetch most recent 15,000 markets by default (sufficient for most analysis)
+        self.fetch_resolved_markets_limited(Some(15000)).await
     }
 
     /// Fetches a single page of markets with optional closed filter

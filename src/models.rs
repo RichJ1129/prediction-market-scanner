@@ -101,7 +101,9 @@ pub struct Trade {
     #[serde(default)]
     pub title: Option<String>,
     #[serde(default)]
-    pub username: Option<String>,
+    pub name: Option<String>,
+    #[serde(default)]
+    pub pseudonym: Option<String>,
 }
 
 /// Represents a wallet's position in a market
