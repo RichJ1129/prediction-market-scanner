@@ -274,7 +274,7 @@ async fn fetch_resolved_markets_page(
     offset: usize,
     limit: usize,
 ) -> Result<Vec<Market>> {
-    let markets: Vec<Market> = client
+    let response = client
         .get(GAMMA_API_URL)
         .query(&[
             ("closed", "true"),
@@ -282,11 +282,28 @@ async fn fetch_resolved_markets_page(
             ("offset", &offset.to_string()),
         ])
         .send()
-        .await?
-        .json()
         .await?;
 
-    Ok(markets)
+    // Check HTTP status
+    if !response.status().is_success() {
+        return Ok(Vec::new()); // Return empty vec for non-success status
+    }
+
+    // Get response text first to check if empty
+    let text = response.text().await?;
+    if text.trim().is_empty() {
+        return Ok(Vec::new()); // Return empty vec for empty responses
+    }
+
+    // Try to parse JSON
+    match serde_json::from_str::<Vec<Market>>(&text) {
+        Ok(markets) => Ok(markets),
+        Err(e) => {
+            // If JSON parsing fails, treat as end of data
+            eprintln!("JSON decode error at offset {}: {} (treating as end of data)", offset, e);
+            Ok(Vec::new())
+        }
+    }
 }
 
 impl Default for PolymarketClient {
