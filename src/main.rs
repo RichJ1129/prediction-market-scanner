@@ -17,19 +17,30 @@ async fn run_single_scan(
     client: &PolymarketClient,
     scanner: &ArbitrageScanner,
 ) -> Result<usize> {
-    let start = Instant::now();
+    let total_start = Instant::now();
 
-    // Fetch all active markets
-    println!("Fetching all active markets from Polymarket...\n");
+    // Fetch all active markets with timing
+    let fetch_start = Instant::now();
     let markets = client.fetch_all_active_markets().await?;
-    println!("Found {} active markets\n", markets.len());
+    let fetch_duration = fetch_start.elapsed();
 
-    // Scan for opportunities
+    println!("✓ Fetched {} markets in {:.2}s (concurrent pagination)\n",
+        markets.len(),
+        fetch_duration.as_secs_f64()
+    );
+
+    // Scan for opportunities with timing
+    let scan_start = Instant::now();
     let opportunities = scanner.scan(&markets);
+    let scan_duration = scan_start.elapsed();
+
+    println!("✓ Scanned markets in {:.3}s (parallel processing)\n",
+        scan_duration.as_secs_f64()
+    );
 
     // Display results
     if opportunities.is_empty() {
-        println!("No arbitrage opportunities found (threshold: total < $0.99)");
+        println!("No arbitrage opportunities found (threshold: total < $0.995)");
         println!("\nThis is normal - efficient markets eliminate arbitrage quickly.");
         println!("Run this periodically to catch fleeting opportunities.");
     } else {
@@ -41,8 +52,13 @@ async fn run_single_scan(
         }
     }
 
-    let elapsed = start.elapsed();
-    println!("[{}] Scan completed ({:.1} seconds)", Utc::now().format("%Y-%m-%dT%H:%M:%SZ"), elapsed.as_secs_f64());
+    let total_elapsed = total_start.elapsed();
+    println!("\n[{}] Scan completed - Total: {:.2}s | Fetch: {:.2}s | Scan: {:.3}s",
+        Utc::now().format("%Y-%m-%dT%H:%M:%SZ"),
+        total_elapsed.as_secs_f64(),
+        fetch_duration.as_secs_f64(),
+        scan_duration.as_secs_f64()
+    );
 
     Ok(opportunities.len())
 }

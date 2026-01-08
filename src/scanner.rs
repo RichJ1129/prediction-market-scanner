@@ -1,6 +1,8 @@
 use crate::models::{ArbitrageOpportunity, Market};
+use rayon::prelude::*;
 
 /// Scans markets for arbitrage opportunities
+#[derive(Clone)]
 pub struct ArbitrageScanner {
     /// The threshold for detecting arbitrage (e.g., 0.99 means YES+NO < $0.99)
     threshold: f64,
@@ -14,13 +16,11 @@ impl ArbitrageScanner {
 
     /// Scans a list of markets and returns all arbitrage opportunities found
     pub fn scan(&self, markets: &[Market]) -> Vec<ArbitrageOpportunity> {
-        let mut opportunities = Vec::new();
-
-        for market in markets {
-            if let Some(opportunity) = self.check_market(market) {
-                opportunities.push(opportunity);
-            }
-        }
+        // Use parallel iterator for CPU-bound scanning across multiple cores
+        let mut opportunities: Vec<ArbitrageOpportunity> = markets
+            .par_iter()
+            .filter_map(|market| self.check_market(market))
+            .collect();
 
         // Sort by profit percentage (highest first)
         opportunities.sort_by(|a, b| b.profit_percent.partial_cmp(&a.profit_percent).unwrap());
