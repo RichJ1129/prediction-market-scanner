@@ -61,18 +61,20 @@ impl WalletScanner {
 
         // Fetch all resolved markets once (to avoid re-fetching for each wallet)
         println!("📚 Loading resolved markets database...");
+        let start = std::time::Instant::now();
         let resolved_markets = self.client.fetch_resolved_markets().await?;
-        println!("✓ Loaded {} resolved markets\n", resolved_markets.len());
+        println!("✓ Loaded {} resolved markets in {:.1}s\n", resolved_markets.len(), start.elapsed().as_secs_f64());
 
         let mut profitable_wallets = Vec::new();
+        let wallet_count = wallet_addresses.len();
 
         for (index, wallet) in wallet_addresses.iter().enumerate() {
-            println!("[{}/{}] Analyzing {}...", index + 1, wallet_addresses.len(), wallet);
+            print!("\r[{}/{}] Analyzing wallets...", index + 1, wallet_count);
+            std::io::Write::flush(&mut std::io::stdout()).ok();
 
             match self.client.fetch_wallet_trades(wallet).await {
                 Ok(trades) => {
                     if trades.is_empty() {
-                        println!("  No trades found.\n");
                         continue;
                     }
 
@@ -84,34 +86,22 @@ impl WalletScanner {
                     let performance = self.analyzer.analyze(&trades, &resolved_markets);
 
                     if performance.resolved_positions < 5 {
-                        println!("  Insufficient data ({} resolved positions).\n", performance.resolved_positions);
                         continue;
                     }
 
                     // Filter for profitable wallets only (positive ROI and net profit)
                     if performance.roi > 0.0 && performance.net_profit > 0.0 {
-                        let (is_suspicious, flags) = self.analyzer.is_suspicious(&performance);
-
-                        if is_suspicious {
-                            println!("  💰 PROFITABLE + SUSPICIOUS! Win rate: {:.1}%, ROI: {:.1}%, Profit: ${:.2}",
-                                performance.win_rate, performance.roi, performance.net_profit);
-                        } else {
-                            println!("  💰 PROFITABLE! Win rate: {:.1}%, ROI: {:.1}%, Profit: ${:.2}",
-                                performance.win_rate, performance.roi, performance.net_profit);
-                        }
+                        let flags = self.analyzer.is_suspicious(&performance).1;
                         profitable_wallets.push((wallet.clone(), username, performance, flags));
-                    } else {
-                        println!("  ✗ Not profitable (Win rate: {:.1}%, ROI: {:.1}%, Profit: ${:.2})",
-                            performance.win_rate, performance.roi, performance.net_profit);
                     }
-
-                    println!();
                 }
-                Err(e) => {
-                    println!("  Error: {}\n", e);
+                Err(_e) => {
+                    // Silently skip errors during batch processing
                 }
             }
         }
+
+        println!(); // New line after progress indicator
 
         // Print summary
         println!("\n{}", "=".repeat(80));

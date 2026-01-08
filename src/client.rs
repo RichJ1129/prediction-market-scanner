@@ -18,7 +18,10 @@ impl PolymarketClient {
     /// Creates a new Polymarket API client
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .unwrap(),
         }
     }
 
@@ -170,6 +173,7 @@ impl PolymarketClient {
     /// Fetches all closed/resolved markets
     pub async fn fetch_resolved_markets(&self) -> Result<Vec<Market>> {
         let limit = 100;
+        let max_concurrent = 10; // Reduced concurrency to avoid rate limits
 
         // Fetch first page to check if pagination is needed
         let first_page = self.fetch_markets_page(0, limit, true).await?;
@@ -182,13 +186,17 @@ impl PolymarketClient {
 
         // Initialize for concurrent fetching
         let mut all_markets = first_page;
-        let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS));
+        let semaphore = Arc::new(Semaphore::new(max_concurrent));
         let mut futures = FuturesUnordered::new();
         let mut next_offset = limit;
         let mut spawned_offsets = std::collections::HashSet::new();
+        let mut consecutive_empty_pages = 0;
+        let max_consecutive_empty = 10; // Stop after 10 consecutive empty pages
+
+        eprint!("  Loading markets");
 
         // Spawn initial batch of concurrent requests
-        for i in 0..MAX_CONCURRENT_REQUESTS {
+        for i in 0..max_concurrent {
             let offset = next_offset + (i * limit);
             spawned_offsets.insert(offset);
 
@@ -202,17 +210,34 @@ impl PolymarketClient {
             }));
         }
 
-        next_offset += MAX_CONCURRENT_REQUESTS * limit;
+        next_offset += max_concurrent * limit;
 
         // Process results and spawn new requests dynamically
         while let Some(result) = futures.next().await {
             match result {
                 Ok((_offset, Ok(markets))) => {
                     let page_count = markets.len();
-                    all_markets.extend(markets);
+
+                    if page_count == 0 {
+                        consecutive_empty_pages += 1;
+                        if consecutive_empty_pages >= max_consecutive_empty {
+                            // Stop spawning new requests, but let existing ones finish
+                            continue;
+                        }
+                    } else {
+                        consecutive_empty_pages = 0; // Reset counter
+                        all_markets.extend(markets);
+
+                        // Show progress - update every 500 markets or show dots
+                        if all_markets.len() % 500 == 0 {
+                            eprint!("\r  Loaded {} markets...", all_markets.len());
+                        } else if all_markets.len() % 100 == 0 {
+                            eprint!(".");
+                        }
+                    }
 
                     // If page is full, spawn next request
-                    if page_count == limit && !spawned_offsets.contains(&next_offset) {
+                    if page_count == limit && !spawned_offsets.contains(&next_offset) && consecutive_empty_pages < max_consecutive_empty {
                         spawned_offsets.insert(next_offset);
 
                         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -229,14 +254,16 @@ impl PolymarketClient {
                     }
                 }
                 Ok((offset, Err(e))) => {
-                    eprintln!("Warning: Failed to fetch page at offset {}: {}", offset, e);
+                    eprintln!("\nWarning: Failed to fetch page at offset {}: {}", offset, e);
+                    consecutive_empty_pages += 1;
                 }
                 Err(e) => {
-                    eprintln!("Warning: Task failed: {}", e);
+                    eprintln!("\nWarning: Task failed: {}", e);
                 }
             }
         }
 
+        eprintln!(); // New line after progress indicator
         Ok(all_markets)
     }
 
