@@ -2,7 +2,6 @@ use crate::client::PolymarketClient;
 use crate::wallet_analyzer::WalletAnalyzer;
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
-use tokio::time::{sleep, Duration};
 
 /// Scans for wallets with suspicious trading patterns
 pub struct WalletScanner {
@@ -215,13 +214,11 @@ impl WalletScanner {
                             println!("   Scans completed: {}", scan_count);
                             println!("   Wallets analyzed: {}", scanned_wallets.len());
                             println!("   Profitable wallets found: {}", all_profitable_wallets.len());
-                            println!("\n⏳ Waiting 10 seconds before next scan... (Press Ctrl+C to stop)\n");
-
-                            sleep(Duration::from_secs(10)).await;
+                            println!("\n🔄 Starting next scan... (Press Ctrl+C to stop)\n");
                         }
                         Err(e) => {
                             println!("❌ Error finding wallets: {}\n", e);
-                            sleep(Duration::from_secs(10)).await;
+                            println!("Retrying immediately...\n");
                         }
                     }
                 } => {}
